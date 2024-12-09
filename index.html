@@ -82,7 +82,7 @@
                 [aiY],
                 [aiY + 20],
                 [aiY - 20]
-            ], [3, 1]); // Shape is 3 rows, 1 column
+            ], [3, 1]);
 
             await model.fit(xs, ys, { epochs: 50 });
             aiModel = model;
@@ -104,7 +104,7 @@
             ball.x = canvas.width / 2;
             ball.y = canvas.height / 2;
             ballSpeedX = -ballSpeedX;
-            ballSpeedY = Math.random() > 0.5 ? 4 : -4;
+            ballSpeedY = Math.random() > 0.5 ? 4 : -4; 
         }
 
         function updateScore() {
@@ -126,6 +126,7 @@
             // Ball collision with top and bottom walls
             if (ball.y <= 0 || ball.y >= canvas.height) {
                 ballSpeedY = -ballSpeedY;
+            }
 
             if (
                 ball.x <= playerPaddle.x + playerPaddle.width &&
