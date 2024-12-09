@@ -18,16 +18,34 @@
             margin: 0 auto;
             background: #222;
         }
+        #score {
+            position: absolute;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 24px;
+        }
+        #difficulty {
+            position: absolute;
+            top: 50px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 18px;
+        }
     </style>
 </head>
 <body>
     <h1 style="text-align: center;">Ping Pong: Player vs AI</h1>
+    <div id="score">Player: 0 | AI: 0</div>
+    <div id="difficulty">Difficulty: Easy</div>
     <canvas id="gameCanvas" width="800" height="600"></canvas>
 
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
     <script>
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
+        const scoreBoard = document.getElementById('score');
+        const difficultyDisplay = document.getElementById('difficulty');
 
         const paddleWidth = 10, paddleHeight = 100;
         const ballSize = 10;
@@ -37,11 +55,16 @@
         let ballX = canvas.width / 2, ballY = canvas.height / 2;
         let ballSpeedX = 4, ballSpeedY = 4;
 
+        let playerScore = 0;
+        let aiScore = 0;
+
         const playerPaddle = { x: 0, y: playerY, width: paddleWidth, height: paddleHeight };
         const aiPaddle = { x: canvas.width - paddleWidth, y: aiY, width: paddleWidth, height: paddleHeight };
         const ball = { x: ballX, y: ballY, size: ballSize };
 
         let aiModel;
+        let difficulty = "Easy";
+        let aiReactionSpeed = 0.1;
 
         async function trainAIModel() {
             const model = tf.sequential();
@@ -82,6 +105,19 @@
             ball.x = canvas.width / 2;
             ball.y = canvas.height / 2;
             ballSpeedX = -ballSpeedX;
+            ballSpeedY = Math.random() > 0.5 ? 4 : -4; // Randomize Y direction
+        }
+
+        function updateScore() {
+            scoreBoard.textContent = `Player: ${playerScore} | AI: ${aiScore}`;
+        }
+
+        function setDifficulty(level) {
+            difficulty = level;
+            if (level === "Easy") aiReactionSpeed = 0.2;
+            else if (level === "Medium") aiReactionSpeed = 0.1;
+            else if (level === "Hard") aiReactionSpeed = 0.05;
+            difficultyDisplay.textContent = `Difficulty: ${level}`;
         }
 
         function updateGame() {
@@ -111,10 +147,18 @@
             if (aiModel) {
                 const input = tf.tensor2d([[ball.x, ball.y, aiPaddle.y]]);
                 const prediction = aiModel.predict(input);
-                aiPaddle.y = prediction.dataSync()[0];
+                const predictedY = prediction.dataSync()[0];
+
+                aiPaddle.y += (predictedY - aiPaddle.y) * aiReactionSpeed;
             }
 
-            if (ball.x <= 0 || ball.x >= canvas.width) {
+            if (ball.x <= 0) {
+                aiScore++;
+                updateScore();
+                resetBall();
+            } else if (ball.x >= canvas.width) {
+                playerScore++;
+                updateScore();
                 resetBall();
             }
         }
@@ -138,7 +182,15 @@
             playerPaddle.y = event.clientY - canvasRect.top - paddleHeight / 2;
         });
 
+        document.addEventListener('keydown', (event) => {
+            if (event.key === '1') setDifficulty("Easy");
+            else if (event.key === '2') setDifficulty("Medium");
+            else if (event.key === '3') setDifficulty("Hard");
+        });
+
         trainAIModel().then(() => {
+            updateScore();
+            setDifficulty("Easy");
             gameLoop();
         });
     </script>
