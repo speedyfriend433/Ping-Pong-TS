@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ping Pong: Player vs AI</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #000;
+            color: #fff;
+            margin: 0;
+            overflow: hidden;
+        }
+        canvas {
+            display: block;
+            margin: 0 auto;
+            background: #222;
+        }
+    </style>
+</head>
+<body>
+    <h1 style="text-align: center;">Ping Pong: Player vs AI</h1>
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
+
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        const paddleWidth = 10, paddleHeight = 100;
+        const ballSize = 10;
+
+        let playerY = canvas.height / 2 - paddleHeight / 2;
+        let aiY = canvas.height / 2 - paddleHeight / 2;
+        let ballX = canvas.width / 2, ballY = canvas.height / 2;
+        let ballSpeedX = 4, ballSpeedY = 4;
+
+        const playerPaddle = { x: 0, y: playerY, width: paddleWidth, height: paddleHeight };
+        const aiPaddle = { x: canvas.width - paddleWidth, y: aiY, width: paddleWidth, height: paddleHeight };
+        const ball = { x: ballX, y: ballY, size: ballSize };
+
+        let aiModel;
+
+        async function trainAIModel() {
+            const model = tf.sequential();
+            model.add(tf.layers.dense({ inputShape: [3], units: 16, activation: 'relu' }));
+            model.add(tf.layers.dense({ units: 16, activation: 'relu' }));
+            model.add(tf.layers.dense({ units: 1, activation: 'linear' }));
+            model.compile({ optimizer: 'adam', loss: 'meanSquaredError' });
+
+            const xs = tf.tensor2d([
+                [ballX, ballY, aiY],
+                [ballX + ballSpeedX, ballY + ballSpeedY, aiY + 10],
+                [ballX - ballSpeedX, ballY - ballSpeedY, aiY - 10]
+            ]);
+            const ys = tf.tensor2d([aiY, aiY + 10, aiY - 10]);
+
+            await model.fit(xs, ys, { epochs: 10 });
+            aiModel = model;
+        }
+
+        function drawRect(x, y, width, height, color) {
+            ctx.fillStyle = color;
+            ctx.fillRect(x, y, width, height);
+        }
+
+        function drawBall(x, y, size, color) {
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            ctx.arc(x, y, size, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        function resetBall() {
+            ball.x = canvas.width / 2;
+            ball.y = canvas.height / 2;
+            ballSpeedX = -ballSpeedX;
+        }
+
+        function updateGame() {
+            ball.x += ballSpeedX;
+            ball.y += ballSpeedY;
+
+            if (ball.y <= 0 || ball.y >= canvas.height) {
+                ballSpeedY = -ballSpeedY;
+            }
+
+            if (
+                ball.x <= playerPaddle.x + playerPaddle.width &&
+                ball.y >= playerPaddle.y &&
+                ball.y <= playerPaddle.y + playerPaddle.height
+            ) {
+                ballSpeedX = -ballSpeedX;
+            }
+
+            if (
+                ball.x >= aiPaddle.x - aiPaddle.width &&
+                ball.y >= aiPaddle.y &&
+                ball.y <= aiPaddle.y + aiPaddle.height
+            ) {
+                ballSpeedX = -ballSpeedX;
+            }
+
+            if (aiModel) {
+                const input = tf.tensor2d([[ball.x, ball.y, aiPaddle.y]]);
+                const prediction = aiModel.predict(input);
+                aiPaddle.y = prediction.dataSync()[0];
+            }
+
+            if (ball.x <= 0 || ball.x >= canvas.width) {
+                resetBall();
+            }
+        }
+
+        function drawGame() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            drawRect(playerPaddle.x, playerPaddle.y, playerPaddle.width, playerPaddle.height, 'white');
+            drawRect(aiPaddle.x, aiPaddle.y, aiPaddle.width, aiPaddle.height, 'white');
+            drawBall(ball.x, ball.y, ball.size, 'white');
+        }
+
+        function gameLoop() {
+            updateGame();
+            drawGame();
+            requestAnimationFrame(gameLoop);
+        }
+
+        canvas.addEventListener('mousemove', (event) => {
+            const canvasRect = canvas.getBoundingClientRect();
+            playerPaddle.y = event.clientY - canvasRect.top - paddleHeight / 2;
+        });
+
+        trainAIModel().then(() => {
+            gameLoop();
+        });
+    </script>
+</body>
+</html>
